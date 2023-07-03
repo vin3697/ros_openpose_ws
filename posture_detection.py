@@ -6,6 +6,7 @@
 import rospy
 from ros_openpose.msg import Frame 
 import math
+from ros_openpose.msg import Posture
 #* declare body parts 
 Neck        = 1 
 Nose        = 0
@@ -33,6 +34,7 @@ LKnee       = 13# Left Knee
 LAnkle      = 14# Left Ankle
 
 threshold_confidence = 0.7
+threshold_distance = 1.2
 
 def angle_calculation(person):
     #angles = []
@@ -70,10 +72,7 @@ def angle_calculation(person):
         return -1 , -1
 
 
-def facing_away(person):
-    return ((((person.bodyParts[Nose].pixel.x == 0) and (person.bodyParts[LEye].pixel.x == 0) and (person.bodyParts[REye].pixel.x == 0)))
-                    or ((person.bodyParts[REar].pixel.x == 0) and (person.bodyParts[LEar].score >= threshold_confidence))
-                    or ((person.bodyParts[LEar].pixel.x == 0) and (person.bodyParts[REar].score >= threshold_confidence)))
+
 
 class all_posture():
 
@@ -85,47 +84,64 @@ class all_posture():
         ly_knee = person.bodyParts[LKnee].pixel.y
         diff_ry = (abs(rhip_y - ry_knee))*100
         diff_ly = (abs(lhip_y - ly_knee))*100
-        #! add condition for angles + execution and return true 
-        #TODO : add angle condition of 45` theta >= 45` and y axis distance between midHip and knee.
         #rospy.loginfo('%d , %d\n',r_angle_formed, l_angle_formed)
-        return (((r_angle_formed >= 45) and (l_angle_formed >= 45)) 
-                or ((diff_ry <= 18) and (diff_ly <= 18)))
+        return (((r_angle_formed >= 45) or (l_angle_formed >= 45)) 
+                or ((diff_ry <= 15) and (diff_ly <= 15)))
+    
+    def facing_away(self, person):
+        return (((person.bodyParts[REar].pixel.x == 0) and (person.bodyParts[LEar].score >= threshold_confidence))
+                    or ((person.bodyParts[LEar].pixel.x == 0) and (person.bodyParts[REar].score >= threshold_confidence)))
+    
+    def facing_back(self, person):
+        return ((person.bodyParts[Nose].pixel.x == 0) and (person.bodyParts[LEye].pixel.x == 0) and (person.bodyParts[REye].pixel.x == 0))
 
 
 def frame_callback(frame):
 
-    posture = all_posture()
-
+    pub_posture = rospy.Publisher('/pose_face', Posture, queue_size=10)
+    pose_face_msg = Posture()
+    posture = all_posture() #object of all_posture() class
     # Extract frame details
     header = frame.header
     frame_id = header.frame_id
-    persons = frame.persons
-    # Process each person in the frame
+    persons = frame.persons    # Process each person in the frame
+    person_counter = 0         #for every frame we have count to be zero!
+
     for person in persons:
 
         #TODO : define custom message to give pose of person with ID
         l_ankle_score = person.bodyParts[LAnkle].score
         r_ankle_score = person.bodyParts[RAnkle].score
         neck_score    = person.bodyParts[Neck].score
+        midHip_distance = person.bodyParts[MidHip].point.z
+        rospy.loginfo('Person ID: %d\n', person_counter) 
+        pose_face_msg.person_id = person_counter 
 
-        if l_ankle_score > threshold_confidence and r_ankle_score > threshold_confidence and neck_score > threshold_confidence:
-            away_facing   = facing_away(person)
-            sitting       = posture.sitting(person)
-
-            if (away_facing and sitting):
-                rospy.loginfo('Person is sitting and facing away!\n')
-
-            elif((not(away_facing)) and sitting):
-                rospy.loginfo('Person is sitting and facing towards!\n')
+        if (l_ankle_score > threshold_confidence or r_ankle_score > threshold_confidence) and neck_score > threshold_confidence and midHip_distance > threshold_distance:
             
-            elif ((away_facing) and (not(sitting))):
-                rospy.loginfo('Person is standing and facing away!\n')
+            if (posture.facing_away(person)):
+                rospy.loginfo('Person is facing away!\n')
+                pose_face_msg.facing = 'FacingSideways'
+            elif (posture.facing_back(person)):
+                rospy.loginfo('Person is facing backward!\n')
+                pose_face_msg.facing = 'FacingBackwards'
+            else:
+                rospy.loginfo('Person is facing towards!\n')
+                pose_face_msg.facing = 'FacingTowards'
 
-            elif ((not(away_facing)) and (not(sitting))):
-                rospy.loginfo('Person is standing and facing towards!\n')
+            if(posture.sitting(person)):
+                rospy.loginfo('Person is sitting!\n')
+                pose_face_msg.pose = 'Sitting'
+            else:
+                rospy.loginfo('Person is standing!\n')
+                pose_face_msg.pose = 'Standing'
 
         else:
-            rospy.loginfo('Whole person is not in the frame!\n')  
+            rospy.loginfo('Whole person is not in the frame!\n')
+            pose_face_msg.pose = 'NoPose'
+            pose_face_msg.facing= 'NoFace'  
+        pub_posture.publish(pose_face_msg)
+        person_counter +=1
             
 
 

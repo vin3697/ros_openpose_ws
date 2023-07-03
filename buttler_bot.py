@@ -147,8 +147,8 @@ def frame_callback(frame):
     robot_movement = movements()
 
 
-    pub = rospy.Publisher('/gesture', Gesture, queue_size=10)
-    rate = rospy.Rate(10)  # 10Hz
+    pub_gesture = rospy.Publisher('/gesture', Gesture, queue_size=10)
+    #rate = rospy.Rate(10)  # 10Hz
     gesture_msg = Gesture() #instance for Gesture msg
 
 
@@ -164,9 +164,9 @@ def frame_callback(frame):
         MidHip_distance = body_parts[MidHip].point.z
         MidHip_score    = body_parts[MidHip].score
 
-        threshold_confidence = 0.8
+        threshold_confidence = 0.6
         near_distance       = 1 # one meter
-        far_distance        = 2 # two meter
+        far_distance        = 4 # two meter
 
         if( (MidHip_score > threshold_confidence) and (near_distance < MidHip_distance < far_distance) ): #this criteria to choose a target person to whom bot will follow!
             #rospy.loginfo('condition works!\n')
@@ -175,49 +175,49 @@ def frame_callback(frame):
                 # call fucntion to move robot
                 #rospy.loginfo('GO Forward!\n')
                 gesture_msg.gesture = "Forward"
-                pub.publish(gesture_msg)
+                pub_gesture.publish(gesture_msg)
                 robot_movement.forward_movement()
 
             elif Gestures.stop_gesture(person):
 
                 #rospy.loginfo('STOP!!!!\n')
                 gesture_msg.gesture = "STOP"
-                pub.publish(gesture_msg)
+                pub_gesture.publish(gesture_msg)
                 robot_movement.stop()
             
             elif Gestures.go_right_gesture(person):
 
                 #rospy.loginfo('GO GO GO Right!\n')
                 gesture_msg.gesture = "GO Right"
-                pub.publish(gesture_msg)
+                pub_gesture.publish(gesture_msg)
                 robot_movement.turn_right()
             
             elif Gestures.go_left_gesture(person):
 
                 #rospy.loginfo('GO GO GO Left \n')
                 gesture_msg.gesture = "GO Left"
-                pub.publish(gesture_msg)
+                pub_gesture.publish(gesture_msg)
                 robot_movement.turn_left()
             
             elif Gestures.go_backward_gesture(person):
 
                 #rospy.loginfo('GO Backward \n')
                 gesture_msg.gesture = "GO Backward"
-                pub.publish(gesture_msg)
+                pub_gesture.publish(gesture_msg)
                 robot_movement.backward_movement()
 
             elif Gestures.go_forward_with_right_turn(person):
 
                 #rospy.loginfo('forward with right turn \n')
                 gesture_msg.gesture = "Forward+R_Turn"
-                pub.publish(gesture_msg)
+                pub_gesture.publish(gesture_msg)
                 robot_movement.forward_right_turn()
 
             elif Gestures.go_forward_with_left_turn(person):
 
                 #rospy.loginfo('forward with left turn \n')
                 gesture_msg.gesture = "Forward+L_Turn"
-                pub.publish(gesture_msg)
+                pub_gesture.publish(gesture_msg)
                 robot_movement.forward_left_turn()
 
 
